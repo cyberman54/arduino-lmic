@@ -119,7 +119,7 @@ void os_wmsbf4 (xref2u1_t buf, u4_t v) {
 
 #if !defined(os_getBattLevel)
 u1_t os_getBattLevel (void) {
-    return MCMD_DEVS_BATT_NOINFO;
+    return LMIC.client.devStatusAns_battery;
 }
 #endif
 
@@ -2815,6 +2815,7 @@ void LMIC_reset (void) {
 
 void LMIC_init (void) {
     LMIC.opmode = OP_SHUTDOWN;
+    LMIC.client.devStatusAns_battery = MCMD_DEVS_BATT_NOINFO;
     LMICbandplan_init();
 }
 
@@ -3101,4 +3102,48 @@ int LMIC_getNetworkTimeReference(lmic_time_reference_t *pReference) {
     LMIC_API_PARAMETER(pReference);
 #endif // LMIC_ENABLE_DeviceTimeReq
     return 0;
+}
+
+///
+/// \brief set battery level to be returned by `DevStatusAns`.
+///
+/// \param uBattLevel is the 8-bit value to be returned. Per LoRaWAN 1.0.3 line 769,
+///             this is \c MCMD_DEVS_EXT_POWER (0) if on external power,
+///             \c MCMD_DEVS_NOINFO (255) if not able to measure battery level,
+///             or a value in [ \c MCMD_DEVS_BATT_MIN, \c MCMD_DEVS_BATT_MAX ], numerically
+///             [1, 254], to represent the charge state of the battery. Note that
+///             this is not millivolts.
+///
+/// \returns
+///     This function returns the previous value of the battery level.
+///
+/// \details
+///     The LMIC maintains an idea of the current battery state, initially set to
+///     \c MCMD_DEVS_NOINFO after the call to LMIC_init(). The appplication then calls
+///     this function from time to time to update the battery level.
+///
+///     It is possible (in non-Arduino environments) to supply a local implementation
+///     of os_getBatteryLevel(). In that case, it's up to the implementation to decide
+///     whether to use the value supplied by this API.
+///
+///     This implementation was chosen to minimize the risk of a battery measurement
+///     introducting breaking delays into the LMIC.
+///
+u1_t LMIC_setBatteryLevel(u1_t uBattLevel) {
+    const u1_t result = LMIC.client.devStatusAns_battery;
+
+    LMIC.client.devStatusAns_battery = uBattLevel;
+    return result;
+}
+
+///
+/// \brief get battery level that is to be returned by `DevStatusAns`.
+///
+/// \returns
+///     This function returns the saved value of the battery level.
+///
+/// \see LMIC_setBatteryLevel()
+///
+u1_t LMIC_getBatteryLevel(void) {
+    return LMIC.client.devStatusAns_battery;
 }
