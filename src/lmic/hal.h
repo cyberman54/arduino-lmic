@@ -83,6 +83,17 @@ void hal_spi_write(u1_t cmd, const u1_t* buf, size_t len);
 void hal_spi_read(u1_t cmd, u1_t* buf, size_t len);
 
 /*
+ * Perform SPI read transaction with SX126x series radio chip
+ *   - write the command byte 'cmd'
+ *   - write the 'addr_len' register address bytes 'addr'
+ *   - write the 'NOP' byte 0x00
+ *   - read 'buf_len' bytes into 'buf'
+ */
+#if (defined(CFG_sx1261_radio) || defined(CFG_sx1262_radio))
+void hal_spi_read_sx126x(u1_t cmd, u1_t* addr, size_t addr_len, u1_t* buf, size_t buf_len);
+#endif
+
+/*
  * disable all CPU interrupts.
  *   - might be invoked nested
  *   - will be followed by matching call to hal_enableIRQs()
@@ -148,8 +159,17 @@ s1_t hal_getRssiCal (void);
  */
 ostime_t hal_setModuleActive (bit_t val);
 
-/* find out if we're using Tcxo */
+/* find out if we're using Tcxo controlled by a host pin */
 bit_t hal_queryUsingTcxo(void);
+
+/* SX126x function: find out if the board is configured for DC-DC regulator control */
+bit_t hal_queryUsingDcdc(void);
+
+/* SX126x function: find out if the board is configured to control the RF switch with modem DIO2 */
+bit_t hal_queryUsingDIO2AsRfSwitch(void);
+
+/* SX126x function: find out if the board is configured to control a TCXO with modem DIO3 */
+bit_t hal_queryUsingDIO3AsTCXOSwitch(void);
 
 /* represent the various radio TX power policy */
 enum	{
@@ -171,6 +191,7 @@ uint8_t hal_getTxPowerPolicy(
 
 void hal_pollPendingIRQs_helper();
 void hal_processPendingIRQs(void);
+bit_t is_busy();
 
 /// \brief check for any pending interrupts: stub if interrupts are enabled.
 static inline void hal_pollPendingIRQs(void)

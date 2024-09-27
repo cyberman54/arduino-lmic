@@ -90,7 +90,11 @@ public:
 
 	virtual void begin(void) {}
 	virtual void end(void) {}
+	virtual uint8_t queryBusyPin(void) { return HalPinmap_t::LMIC_UNUSED_PIN; }
 	virtual bool queryUsingTcxo(void) { return false; }
+	virtual bool queryUsingDcdc(void) { return false; }
+	virtual bool queryUsingDIO2AsRfSwitch(void) { return false; }
+	virtual bool queryUsingDIO3AsTCXOSwitch(void) { return false; }
 
 	// compute desired transmit power policy.  HopeRF needs
 	// (and previous versions of this library always chose)

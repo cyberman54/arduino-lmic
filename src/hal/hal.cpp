@@ -33,7 +33,10 @@ static void hal_io_init () {
     // NSS and DIO0 are required, DIO1 is required for LoRa, DIO2 for FSK
     ASSERT(plmic_pins->nss != LMIC_UNUSED_PIN);
     ASSERT(plmic_pins->dio[0] != LMIC_UNUSED_PIN);
+    // SX126x family can operate with a single DIO
+#if (defined(CFG_sx1276_radio) || defined(CFG_sx1272_radio))
     ASSERT(plmic_pins->dio[1] != LMIC_UNUSED_PIN || plmic_pins->dio[2] != LMIC_UNUSED_PIN);
+#endif
 
 //    Serial.print("nss: "); Serial.println(plmic_pins->nss);
 //    Serial.print("rst: "); Serial.println(plmic_pins->rst);
@@ -53,6 +56,10 @@ static void hal_io_init () {
     if (plmic_pins->rst != LMIC_UNUSED_PIN) {
         // initialize RST to floating
         pinMode(plmic_pins->rst, INPUT);
+    }
+
+    if (pHalConfig->queryBusyPin() != LMIC_UNUSED_PIN) {
+        pinMode(pHalConfig->queryBusyPin(), INPUT);
     }
 
     hal_interrupt_init();
@@ -184,6 +191,13 @@ static void hal_spi_init () {
     SPI.begin();
 }
 
+#if (defined(CFG_sx1261_radio) || defined(CFG_sx1262_radio))
+bit_t is_busy() {
+    // SX126x uses BUSY pin
+    return digitalRead(pHalConfig->queryBusyPin()) ? true : false;
+}
+#endif
+
 static void hal_spi_trx(u1_t cmd, u1_t* buf, size_t len, bit_t is_read) {
     uint32_t spi_freq;
     u1_t nss = plmic_pins->nss;
@@ -194,6 +208,11 @@ static void hal_spi_trx(u1_t cmd, u1_t* buf, size_t len, bit_t is_read) {
     SPISettings settings(spi_freq, MSBFIRST, SPI_MODE0);
     SPI.beginTransaction(settings);
     digitalWrite(nss, 0);
+
+    // SX126x modems use BUSY pin. Only interact with SPI when BUSY goes LOW 
+#if (defined(CFG_sx1261_radio) || defined(CFG_sx1262_radio))
+    while (is_busy());
+#endif
 
     SPI.transfer(cmd);
 
@@ -215,6 +234,41 @@ void hal_spi_write(u1_t cmd, const u1_t* buf, size_t len) {
 void hal_spi_read(u1_t cmd, u1_t* buf, size_t len) {
     hal_spi_trx(cmd, buf, len, 1);
 }
+
+// SX126x modems behave slightly differently to SX127x. They will often need to transfer multiple bytes before reading
+#if (defined(CFG_sx1261_radio) || defined(CFG_sx1262_radio))
+void hal_spi_read_sx126x(u1_t cmd, u1_t* addr, size_t addr_len, u1_t* buf, size_t buf_len) {
+    uint32_t spi_freq;
+    u1_t nss = plmic_pins->nss;
+
+    if ((spi_freq = plmic_pins->spi_freq) == 0)
+        spi_freq = LMIC_SPI_FREQ;
+
+    SPISettings settings(spi_freq, MSBFIRST, SPI_MODE0);
+    SPI.beginTransaction(settings);
+    digitalWrite(nss, 0);
+
+    while (is_busy());
+
+    SPI.transfer(cmd);
+
+    // Transfer address and NOP bits 
+    for (; addr_len > 0; --addr_len, ++addr) {
+        u1_t addr_byte = *addr;
+        SPI.transfer(addr_byte);
+    }
+
+    // Read buf_len bytes to buf
+    for (; buf_len > 0; --buf_len, ++buf) {
+        u1_t data = 0x00;
+        data = SPI.transfer(data);
+        *buf = data;
+    }
+
+    digitalWrite(nss, 1);
+    SPI.endTransaction();
+}
+#endif
 
 // -----------------------------------------------------------------------------
 // TIME
@@ -497,6 +551,18 @@ ostime_t hal_setModuleActive (bit_t val) {
 
 bit_t hal_queryUsingTcxo(void) {
     return pHalConfig->queryUsingTcxo();
+}
+
+bit_t hal_queryUsingDcdc(void) {
+    return pHalConfig->queryUsingDcdc();
+}
+
+bit_t hal_queryUsingDIO2AsRfSwitch(void) {
+    return pHalConfig->queryUsingDIO2AsRfSwitch();
+}
+
+bit_t hal_queryUsingDIO3AsTCXOSwitch(void) {
+    return pHalConfig->queryUsingDIO3AsTCXOSwitch();
 }
 
 uint8_t hal_getTxPowerPolicy(

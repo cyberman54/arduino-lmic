@@ -31,7 +31,7 @@
 #define LMIC_DR_LEGACY 0
 
 #include "lmic.h"
-
+#if (CFG_sx1272_radio || CFG_sx1276_radio)
 // ----------------------------------------
 // Registers Mapping
 //                                                      // -type-       1272 vs 1276
@@ -1441,3 +1441,4 @@ void os_radio (u1_t mode) {
 ostime_t os_getRadioRxRampup (void) {
     return RX_RAMPUP_DEFAULT;
 }
+#endif
